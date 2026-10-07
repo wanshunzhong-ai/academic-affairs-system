@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aas.mapper.SysMenuMapper">
+
+    <select id="selectMenusByUserId" resultType="com.aas.entity.SysMenu">
+        SELECT DISTINCT m.id, m.parent_id, m.menu_name, m.menu_type, m.path, m.component,
+                        m.perms, m.icon, m.sort, m.visible, m.status
+        FROM sys_menu m
+        INNER JOIN sys_role_menu rm ON rm.menu_id = m.id
+        INNER JOIN sys_user_role ur ON ur.role_id = rm.role_id
+        INNER JOIN sys_role r ON r.id = ur.role_id AND r.status = 1
+        WHERE ur.user_id = #{userId}
+          AND m.status = 1
+          AND m.menu_type IN ('M', 'C')
+        ORDER BY m.parent_id ASC, m.sort ASC, m.id ASC
+    </select>
+
+    <select id="selectPermsByUserId" resultType="java.lang.String">
+        SELECT DISTINCT m.perms
+        FROM sys_menu m
+        INNER JOIN sys_role_menu rm ON rm.menu_id = m.id
+        INNER JOIN sys_user_role ur ON ur.role_id = rm.role_id
+        WHERE ur.user_id = #{userId}
+          AND m.status = 1
+          AND m.perms IS NOT NULL
+          AND m.perms != ''
+    </select>
+
+    <select id="selectMenuIdsByRoleId" resultType="java.lang.Long">
+        SELECT menu_id FROM sys_role_menu WHERE role_id = #{roleId}
+    </select>
+
+    <select id="selectAllMenus" resultType="com.aas.entity.SysMenu">
+        SELECT id, parent_id, menu_name, menu_type, path, component, perms, icon, sort, visible, status, create_time
+        FROM sys_menu
+        ORDER BY parent_id ASC, sort ASC, id ASC
+    </select>
+
+</mapper>

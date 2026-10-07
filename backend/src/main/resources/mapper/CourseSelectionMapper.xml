@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aas.mapper.CourseSelectionMapper">
+
+    <sql id="selectionColumns">
+        sel.id, sel.student_id, sel.offering_id, sel.select_type, sel.select_time, sel.status, sel.remark,
+        s.student_no AS studentNo, s.name AS studentName,
+        c.class_name AS className,
+        cc.course_code AS courseCode, cc.course_name AS courseName, cc.credit AS credit,
+        cc.course_type AS courseType,
+        t.name AS teacherName,
+        sem.semester_name AS semesterName
+    </sql>
+
+    <sql id="selectionJoins">
+        FROM course_selection sel
+        INNER JOIN stu_student s ON s.id = sel.student_id AND s.deleted = 0
+        INNER JOIN course_offering o ON o.id = sel.offering_id AND o.deleted = 0
+        INNER JOIN course_course cc ON cc.id = o.course_id AND cc.deleted = 0
+        LEFT JOIN base_class c ON c.id = s.class_id AND c.deleted = 0
+        LEFT JOIN tea_teacher t ON t.id = o.teacher_id AND t.deleted = 0
+        LEFT JOIN base_semester sem ON sem.id = o.semester_id
+    </sql>
+
+    <select id="selectSelectionPage" resultType="com.aas.entity.CourseSelection">
+        SELECT
+        <include refid="selectionColumns"/>
+        <include refid="selectionJoins"/>
+        WHERE 1 = 1
+        <if test="scope != null and !scope.global">
+            <choose>
+                <when test="scope.studentId != null">
+                    AND sel.student_id = #{scope.studentId}
+                </when>
+                <when test="scope.classIds != null and scope.classIds.size() > 0">
+                    AND s.class_id IN
+                    <foreach collection="scope.classIds" item="cid" open="(" separator="," close=")">#{cid}</foreach>
+                </when>
+                <otherwise>
+                    AND 1 = 0
+                </otherwise>
+            </choose>
+        </if>
+        <if test="q.keyword != null and q.keyword != ''">
+            AND (s.student_no LIKE CONCAT('%', #{q.keyword}, '%')
+            OR s.name LIKE CONCAT('%', #{q.keyword}, '%')
+            OR cc.course_name LIKE CONCAT('%', #{q.keyword}, '%'))
+        </if>
+        <if test="q.semesterId != null">AND o.semester_id = #{q.semesterId}</if>
+        <if test="q.offeringId != null">AND sel.offering_id = #{q.offeringId}</if>
+        <if test="q.classId != null">AND s.class_id = #{q.classId}</if>
+        <if test="q.courseId != null">AND o.course_id = #{q.courseId}</if>
+        <if test="q.studentId != null">AND sel.student_id = #{q.studentId}</if>
+        <if test="q.status != null">AND sel.status = #{q.status}</if>
+        ORDER BY sem.id DESC, c.id ASC, s.student_no ASC
+    </select>
+
+    <select id="selectByStudent" resultType="com.aas.entity.CourseSelection">
+        SELECT
+        <include refid="selectionColumns"/>
+        <include refid="selectionJoins"/>
+        WHERE sel.student_id = #{studentId}
+        <if test="semesterId != null">AND o.semester_id = #{semesterId}</if>
+        ORDER BY sel.status DESC, cc.course_code ASC
+    </select>
+
+    <select id="selectByOffering" resultType="com.aas.entity.CourseSelection">
+        SELECT
+        <include refid="selectionColumns"/>
+        <include refid="selectionJoins"/>
+        WHERE sel.offering_id = #{offeringId} AND sel.status = 1
+        ORDER BY s.student_no ASC
+    </select>
+
+    <select id="sumSelectedCredit" resultType="java.math.BigDecimal">
+        SELECT IFNULL(SUM(cc.credit), 0)
+        FROM course_selection sel
+        INNER JOIN course_offering o ON o.id = sel.offering_id AND o.deleted = 0
+        INNER JOIN course_course cc ON cc.id = o.course_id AND cc.deleted = 0
+        WHERE sel.student_id = #{studentId} AND sel.status = 1
+        <if test="semesterId != null">AND o.semester_id = #{semesterId}</if>
+    </select>
+
+</mapper>

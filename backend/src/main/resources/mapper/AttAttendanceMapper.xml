@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aas.mapper.AttAttendanceMapper">
+
+    <select id="selectAttendancePage" resultType="com.aas.entity.AttAttendance">
+        SELECT
+        a.id, a.student_id, a.offering_id, a.attend_date, a.attend_type, a.remark, a.recorder_id, a.create_time,
+        s.student_no AS studentNo, s.name AS studentName,
+        c.class_name AS className,
+        cc.course_name AS courseName,
+        CASE a.attend_type
+        WHEN 1 THEN '出勤' WHEN 2 THEN '迟到' WHEN 3 THEN '早退' WHEN 4 THEN '缺勤' WHEN 5 THEN '请假'
+        ELSE '未知' END AS attendTypeText,
+        t.name AS recorderName
+        FROM att_attendance a
+        INNER JOIN stu_student s ON s.id = a.student_id AND s.deleted = 0
+        LEFT JOIN base_class c ON c.id = s.class_id AND c.deleted = 0
+        LEFT JOIN course_offering o ON o.id = a.offering_id AND o.deleted = 0
+        LEFT JOIN course_course cc ON cc.id = o.course_id AND cc.deleted = 0
+        LEFT JOIN tea_teacher t ON t.id = a.recorder_id
+        WHERE 1 = 1
+        <if test="scope != null and !scope.global">
+            <choose>
+                <when test="scope.studentId != null">
+                    AND a.student_id = #{scope.studentId}
+                </when>
+                <when test="scope.classIds != null and scope.classIds.size() > 0">
+                    AND s.class_id IN
+                    <foreach collection="scope.classIds" item="cid" open="(" separator="," close=")">#{cid}</foreach>
+                </when>
+                <otherwise>
+                    AND 1 = 0
+                </otherwise>
+            </choose>
+        </if>
+        <if test="q.keyword != null and q.keyword != ''">
+            AND (s.student_no LIKE CONCAT('%', #{q.keyword}, '%')
+            OR s.name LIKE CONCAT('%', #{q.keyword}, '%')
+            OR cc.course_name LIKE CONCAT('%', #{q.keyword}, '%'))
+        </if>
+        <if test="q.classId != null">AND s.class_id = #{q.classId}</if>
+        <if test="q.offeringId != null">AND a.offering_id = #{q.offeringId}</if>
+        <if test="q.studentId != null">AND a.student_id = #{q.studentId}</if>
+        <if test="q.attendType != null">AND a.attend_type = #{q.attendType}</if>
+        <if test="q.startDate != null">AND a.attend_date &gt;= #{q.startDate}</if>
+        <if test="q.endDate != null">AND a.attend_date &lt;= #{q.endDate}</if>
+        ORDER BY a.attend_date DESC, s.student_no ASC
+    </select>
+
+    <select id="selectStudentStats" resultType="java.util.Map">
+        SELECT
+        CASE a.attend_type
+        WHEN 1 THEN '出勤' WHEN 2 THEN '迟到' WHEN 3 THEN '早退' WHEN 4 THEN '缺勤' WHEN 5 THEN '请假'
+        ELSE '未知' END AS name,
+        COUNT(*) AS value
+        FROM att_attendance a
+        WHERE a.student_id = #{studentId}
+        GROUP BY name
+        ORDER BY MIN(a.attend_type) ASC
+    </select>
+
+    <select id="selectClassStats" resultType="java.util.Map">
+        SELECT
+        s.name AS studentName,
+        s.student_no AS studentNo,
+        IFNULL(SUM(CASE WHEN a.attend_type = 4 THEN 1 ELSE 0 END), 0) AS absentCount,
+        IFNULL(SUM(CASE WHEN a.attend_type = 2 THEN 1 ELSE 0 END), 0) AS lateCount,
+        IFNULL(SUM(CASE WHEN a.attend_type = 3 THEN 1 ELSE 0 END), 0) AS earlyCount,
+        IFNULL(SUM(CASE WHEN a.attend_type = 5 THEN 1 ELSE 0 END), 0) AS leaveCount,
+        COUNT(a.id) AS totalCount
+        FROM stu_student s
+        LEFT JOIN att_attendance a ON a.student_id = s.id
+        WHERE s.class_id = #{classId} AND s.deleted = 0
+        GROUP BY s.id, s.name, s.student_no
+        ORDER BY absentCount DESC, lateCount DESC
+    </select>
+
+</mapper>

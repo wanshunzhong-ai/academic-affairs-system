@@ -1,0 +1,49 @@
+======================================================================
+登录入口一致性校验（单一入口 /login）
+======================================================================
+
+[1] 四个身份定义（frontend/src/utils/loginRoles.js）
+      学生      roleCode=STUDENT        演示账号=2023001
+      班主任     roleCode=HEAD_TEACHER   演示账号=T1001
+      教务处     roleCode=ACADEMIC       演示账号=jwc001
+      管理员     roleCode=ADMIN          演示账号=admin
+      数量：4
+
+[2] 入口收口检查（只允许一个登录入口）
+  [PASS] loginRoles.js 定义了唯一登录入口 LOGIN_PATH = /login
+  [PASS] loginRoles.js 定义了登录后落地页 HOME_PATH
+  [PASS] 已移除四入口派生函数 loginPathOf()
+  [PASS] 已移除四入口常量 DEFAULT_LOGIN_PATH
+  [PASS] router 只注册一个登录路由（component: LoginView 仅 1 处）
+  [PASS] router 不再按 LOGIN_ROLES 派生登录路由
+  [PASS] 旧地址 /login/xxx（student、admin 等）回落唯一入口
+  [PASS] 路由守卫按登录路径前缀判断（含子路径）
+  [PASS] 未登录访问受保护页面会带 redirect 跳到唯一入口
+  [PASS] Layout 退出登录回唯一入口
+  [PASS] 请求拦截器 401 后回唯一入口
+
+[3] 身份定义唯一性与完整性
+  [PASS] 身份 key 无重复
+  [PASS] roleCode 无重复（一个身份只能有一条配置）
+  [PASS] roleCode / 演示账号均已填写
+  [PASS] 四个身份齐备（STUDENT / HEAD_TEACHER / ACADEMIC / ADMIN）
+
+[4] 与数据库 sys_role / sys_user 比对
+      数据库角色码：ACADEMIC, ADMIN, HEAD_TEACHER, STUDENT
+  [PASS] 身份 [student] 的 roleCode 'STUDENT' 在 sys_role 中存在
+  [PASS] 身份 [headteacher] 的 roleCode 'HEAD_TEACHER' 在 sys_role 中存在
+  [PASS] 身份 [academic] 的 roleCode 'ACADEMIC' 在 sys_role 中存在
+  [PASS] 身份 [admin] 的 roleCode 'ADMIN' 在 sys_role 中存在
+  [PASS] 演示账号 2023001  (吴晓) 角色匹配 -> STUDENT
+  [PASS] 演示账号 T1001    (夏军) 角色匹配 -> HEAD_TEACHER
+  [PASS] 演示账号 jwc001   (张国华) 角色匹配 -> ACADEMIC
+  [PASS] 演示账号 admin    (系统管理员) 角色匹配 -> ADMIN
+
+[5] 登录地址
+      唯一登录入口  : /login
+      登录后落地页  : /dashboard（内容与左侧菜单按账号身份区分）
+      旧地址回落    : /login/student、/login/headteacher、/login/academic、/login/admin -> /login
+
+======================================================================
+通过 23 项 / 失败 0 项
+======================================================================

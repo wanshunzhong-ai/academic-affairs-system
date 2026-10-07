@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aas.mapper.CourseScheduleMapper">
+
+    <sql id="scheduleColumns">
+        cs.id, cs.offering_id, cs.week_day, cs.start_section, cs.end_section,
+        cs.start_week, cs.end_week, cs.classroom_id, cs.create_time,
+        cr.room_name AS classroomName, cr.building AS building
+    </sql>
+
+    <select id="selectByOfferingId" resultType="com.aas.entity.CourseSchedule">
+        SELECT
+        <include refid="scheduleColumns"/>
+        FROM course_schedule cs
+        LEFT JOIN base_classroom cr ON cr.id = cs.classroom_id AND cr.deleted = 0
+        WHERE cs.offering_id = #{offeringId}
+        ORDER BY cs.week_day ASC, cs.start_section ASC
+    </select>
+
+    <select id="selectByOfferingIds" resultType="com.aas.entity.CourseSchedule">
+        SELECT
+        <include refid="scheduleColumns"/>
+        FROM course_schedule cs
+        LEFT JOIN base_classroom cr ON cr.id = cs.classroom_id AND cr.deleted = 0
+        WHERE cs.offering_id IN
+        <foreach collection="offeringIds" item="oid" open="(" separator="," close=")">#{oid}</foreach>
+        ORDER BY cs.offering_id ASC, cs.week_day ASC, cs.start_section ASC
+    </select>
+
+    <select id="selectConflicts" resultType="java.util.Map">
+        SELECT cs.week_day AS weekDay, cs.start_section AS startSection, cs.end_section AS endSection,
+               cs.classroom_id AS classroomId,
+               o.id AS offeringId, o.teacher_id AS teacherId, o.class_id AS classId,
+               cc.course_name AS courseName, t.name AS teacherName,
+               c.class_name AS className, cr.room_name AS roomName
+        FROM course_schedule cs
+        INNER JOIN course_offering o ON o.id = cs.offering_id AND o.deleted = 0
+        INNER JOIN course_course cc ON cc.id = o.course_id AND cc.deleted = 0
+        LEFT JOIN tea_teacher t ON t.id = o.teacher_id
+        LEFT JOIN base_class c ON c.id = o.class_id
+        LEFT JOIN base_classroom cr ON cr.id = cs.classroom_id
+        WHERE o.semester_id = #{semesterId}
+          AND cs.offering_id != #{offeringId}
+          AND cs.week_day = #{weekDay}
+          AND cs.start_section &lt;= #{endSection}
+          AND cs.end_section &gt;= #{startSection}
+          AND cs.start_week &lt;= #{endWeek}
+          AND cs.end_week &gt;= #{startWeek}
+          AND (
+                (#{teacherId} IS NOT NULL AND o.teacher_id = #{teacherId})
+             OR (#{classId} IS NOT NULL AND o.class_id = #{classId})
+             OR (#{classroomId} IS NOT NULL AND cs.classroom_id = #{classroomId})
+              )
+    </select>
+
+    <delete id="deleteByOfferingId">
+        DELETE FROM course_schedule WHERE offering_id = #{offeringId}
+    </delete>
+
+</mapper>

@@ -1,0 +1,32 @@
+# 统一换行符策略：仓库内一律存 LF，检出时按下面的规则还原。
+# 这么做的原因是本项目的 .bat 脚本**必须**是 CRLF，否则 cmd 会解析出错
+# （见 README「关键设计说明」）。显式声明后就与各人本地的 core.autocrlf 设置无关了。
+* text=auto
+
+# Windows 批处理：检出时必须 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Shell 脚本：检出时 LF
+*.sh text eol=lf
+
+# 二进制文件：不做任何换行符转换
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.jar binary
+*.zip binary
+*.xlsx binary
+*.docx binary
+*.pdf binary
+
+# 让 GitHub 语言统计正确识别（可选，对展示有帮助）
+*.java linguist-language=Java
+*.vue linguist-language=Vue

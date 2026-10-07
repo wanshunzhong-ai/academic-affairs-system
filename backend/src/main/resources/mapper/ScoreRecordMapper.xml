@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aas.mapper.ScoreRecordMapper">
+
+    <sql id="scoreColumns">
+        sc.id, sc.student_id, sc.offering_id, sc.usual_score, sc.exam_score, sc.total_score,
+        sc.grade_point, sc.status, sc.is_retake, sc.input_by, sc.input_time, sc.publish_time,
+        sc.remark, sc.create_time, sc.update_time,
+        s.student_no AS studentNo, s.name AS studentName,
+        c.class_name AS className,
+        cc.course_code AS courseCode, cc.course_name AS courseName, cc.credit AS credit,
+        cc.course_type AS courseType,
+        t.name AS teacherName,
+        sem.semester_name AS semesterName, o.semester_id AS semesterId
+    </sql>
+
+    <sql id="scoreJoins">
+        FROM score_record sc
+        INNER JOIN stu_student s ON s.id = sc.student_id AND s.deleted = 0
+        INNER JOIN course_offering o ON o.id = sc.offering_id AND o.deleted = 0
+        INNER JOIN course_course cc ON cc.id = o.course_id AND cc.deleted = 0
+        LEFT JOIN base_class c ON c.id = s.class_id AND c.deleted = 0
+        LEFT JOIN tea_teacher t ON t.id = o.teacher_id AND t.deleted = 0
+        LEFT JOIN base_semester sem ON sem.id = o.semester_id
+    </sql>
+
+    <select id="selectScorePage" resultType="com.aas.entity.ScoreRecord">
+        SELECT
+        <include refid="scoreColumns"/>
+        <include refid="scoreJoins"/>
+        WHERE 1 = 1
+        <if test="scope != null and !scope.global">
+            <choose>
+                <when test="scope.studentId != null">
+                    AND sc.student_id = #{scope.studentId}
+                </when>
+                <when test="scope.classIds != null and scope.classIds.size() > 0">
+                    AND s.class_id IN
+                    <foreach collection="scope.classIds" item="cid" open="(" separator="," close=")">#{cid}</foreach>
+                </when>
+                <otherwise>
+                    AND 1 = 0
+                </otherwise>
+            </choose>
+        </if>
+        <if test="q.keyword != null and q.keyword != ''">
+            AND (s.student_no LIKE CONCAT('%', #{q.keyword}, '%')
+            OR s.name LIKE CONCAT('%', #{q.keyword}, '%')
+            OR cc.course_name LIKE CONCAT('%', #{q.keyword}, '%'))
+        </if>
+        <if test="q.semesterId != null">AND o.semester_id = #{q.semesterId}</if>
+        <if test="q.offeringId != null">AND sc.offering_id = #{q.offeringId}</if>
+        <if test="q.classId != null">AND s.class_id = #{q.classId}</if>
+        <if test="q.courseId != null">AND o.course_id = #{q.courseId}</if>
+        <if test="q.studentId != null">AND sc.student_id = #{q.studentId}</if>
+        <if test="q.status != null">AND sc.status = #{q.status}</if>
+        <if test="q.onlyFail != null and q.onlyFail">
+            AND sc.total_score IS NOT NULL AND sc.total_score &lt; 60
+        </if>
+        ORDER BY sem.id DESC, c.id ASC, s.student_no ASC, cc.course_code ASC
+    </select>
+
+    <select id="selectByStudent" resultType="com.aas.entity.ScoreRecord">
+        SELECT
+        <include refid="scoreColumns"/>
+        <include refid="scoreJoins"/>
+        WHERE sc.student_id = #{studentId}
+        <if test="semesterId != null">AND o.semester_id = #{semesterId}</if>
+        ORDER BY o.semester_id DESC, cc.course_code ASC
+    </select>
+
+    <select id="selectByOffering" resultType="com.aas.entity.ScoreRecord">
+        SELECT
+        <include refid="scoreColumns"/>
+        <include refid="scoreJoins"/>
+        WHERE sc.offering_id = #{offeringId}
+        ORDER BY s.student_no ASC
+    </select>
+
+    <select id="selectScoreDistribution" resultType="java.util.Map">
+        SELECT
+        CASE
+        WHEN sc.total_score &gt;= 90 THEN '优秀(90-100)'
+        WHEN sc.total_score &gt;= 80 THEN '良好(80-89)'
+        WHEN sc.total_score &gt;= 70 THEN '中等(70-79)'
+        WHEN sc.total_score &gt;= 60 THEN '及格(60-69)'
+        ELSE '不及格(&lt;60)'
+        END AS name,
+        COUNT(*) AS value
+        FROM score_record sc
+        WHERE sc.offering_id = #{offeringId} AND sc.total_score IS NOT NULL
+        GROUP BY name
+        ORDER BY MIN(sc.total_score) DESC
+    </select>
+
+    <select id="selectCourseAvgStats" resultType="java.util.Map">
+        SELECT
+        cc.course_name AS name,
+        IFNULL(ROUND(AVG(sc.total_score), 2), 0) AS avgScore,
+        COUNT(*) AS totalCount,
+        IFNULL(SUM(CASE WHEN sc.total_score &gt;= 60 THEN 1 ELSE 0 END), 0) AS passCount,
+        IFNULL(SUM(CASE WHEN sc.total_score &gt;= 90 THEN 1 ELSE 0 END), 0) AS excellentCount,
+        IFNULL(MAX(sc.total_score), 0) AS maxScore,
+        IFNULL(MIN(sc.total_score), 0) AS minScore
+        FROM score_record sc
+        INNER JOIN course_offering o ON o.id = sc.offering_id AND o.deleted = 0
+        INNER JOIN course_course cc ON cc.id = o.course_id AND cc.deleted = 0
+        INNER JOIN stu_student s ON s.id = sc.student_id AND s.deleted = 0
+        WHERE sc.total_score IS NOT NULL
+        <if test="classId != null">AND s.class_id = #{classId}</if>
+        <if test="semesterId != null">AND o.semester_id = #{semesterId}</if>
+        GROUP BY cc.id, cc.course_name
+        ORDER BY avgScore DESC
+    </select>
+
+    <select id="selectStudentSummary" resultType="java.util.Map">
+        SELECT
+        COUNT(*) AS courseCount,
+        IFNULL(ROUND(AVG(sc.total_score), 2), 0) AS avgScore,
+        IFNULL(ROUND(AVG(sc.grade_point), 2), 0) AS avgPoint,
+        IFNULL(SUM(CASE WHEN sc.total_score &gt;= 60 THEN cc.credit ELSE 0 END), 0) AS earnedCredit,
+        IFNULL(SUM(cc.credit), 0) AS totalCredit,
+        IFNULL(SUM(CASE WHEN sc.total_score &gt;= 90 THEN 1 ELSE 0 END), 0) AS excellentCount,
+        IFNULL(SUM(CASE WHEN sc.total_score &lt; 60 THEN 1 ELSE 0 END), 0) AS failCount,
+        IFNULL(MAX(sc.total_score), 0) AS maxScore
+        FROM score_record sc
+        INNER JOIN course_offering o ON o.id = sc.offering_id AND o.deleted = 0
+        INNER JOIN course_course cc ON cc.id = o.course_id AND cc.deleted = 0
+        WHERE sc.student_id = #{studentId}
+        </select>
+
+    <select id="selectOfferingSummary" resultType="java.util.Map">
+        SELECT
+        COUNT(*) AS totalCount,
+        IFNULL(ROUND(AVG(sc.total_score), 2), 0) AS avgScore,
+        IFNULL(SUM(CASE WHEN sc.total_score &gt;= 60 THEN 1 ELSE 0 END), 0) AS passCount,
+        IFNULL(SUM(CASE WHEN sc.total_score &lt; 60 THEN 1 ELSE 0 END), 0) AS failCount,
+        IFNULL(SUM(CASE WHEN sc.total_score &gt;= 90 THEN 1 ELSE 0 END), 0) AS excellentCount,
+        IFNULL(MAX(sc.total_score), 0) AS maxScore,
+        IFNULL(MIN(sc.total_score), 0) AS minScore
+        FROM score_record sc
+        WHERE sc.offering_id = #{offeringId} AND sc.total_score IS NOT NULL
+        </select>
+
+    <select id="selectSelectDistributionGlobal" resultType="java.util.Map">
+        SELECT
+        CASE
+        WHEN total_score &gt;= 90 THEN '优秀(90-100)'
+        WHEN total_score &gt;= 80 THEN '良好(80-89)'
+        WHEN total_score &gt;= 70 THEN '中等(70-79)'
+        WHEN total_score &gt;= 60 THEN '及格(60-69)'
+        ELSE '不及格(&lt;60)'
+        END AS name,
+        COUNT(*) AS value
+        FROM score_record
+        WHERE total_score IS NOT NULL AND status = 2
+        GROUP BY name
+        ORDER BY MIN(total_score) DESC
+    </select>
+
+    <select id="selectStudentScoreDistribution" resultType="java.util.Map">
+        SELECT
+        CASE
+        WHEN sc.total_score &gt;= 90 THEN '优秀(90-100)'
+        WHEN sc.total_score &gt;= 80 THEN '良好(80-89)'
+        WHEN sc.total_score &gt;= 70 THEN '中等(70-79)'
+        WHEN sc.total_score &gt;= 60 THEN '及格(60-69)'
+        ELSE '不及格(&lt;60)'
+        END AS name,
+        COUNT(*) AS value
+        FROM score_record sc
+        WHERE sc.student_id = #{studentId} AND sc.total_score IS NOT NULL
+        GROUP BY name
+        ORDER BY MIN(sc.total_score) DESC
+    </select>
+
+    <select id="selectClassStudentRank" resultType="java.util.Map">
+        SELECT s.name AS studentName, s.student_no AS studentNo,
+               ROUND(AVG(sc.total_score), 2) AS avgScore,
+               SUM(CASE WHEN sc.total_score &gt;= 60 THEN cc.credit ELSE 0 END) AS earnedCredit
+        FROM score_record sc
+        INNER JOIN stu_student s ON s.id = sc.student_id AND s.deleted = 0
+        INNER JOIN course_offering o ON o.id = sc.offering_id AND o.deleted = 0
+        INNER JOIN course_course cc ON cc.id = o.course_id AND cc.deleted = 0
+        WHERE s.class_id = #{classId} AND sc.total_score IS NOT NULL
+        <if test="semesterId != null">AND o.semester_id = #{semesterId}</if>
+        GROUP BY s.id, s.name, s.student_no
+        ORDER BY avgScore DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aas.mapper.AttLeaveMapper">
+
+    <sql id="leaveColumns">
+        l.id, l.student_id, l.leave_type, l.start_date, l.end_date, l.days, l.reason, l.status,
+        l.approver_id, l.approver_name, l.approve_time, l.approve_remark, l.create_time,
+        s.student_no AS studentNo, s.name AS studentName,
+        s.class_id AS classId,
+        c.class_name AS className,
+        CASE l.status
+        WHEN 0 THEN '待审批' WHEN 1 THEN '已通过' WHEN 2 THEN '已驳回' WHEN 3 THEN '已撤销'
+        ELSE '未知' END AS statusText
+    </sql>
+
+    <sql id="leaveJoins">
+        FROM att_leave l
+        INNER JOIN stu_student s ON s.id = l.student_id AND s.deleted = 0
+        LEFT JOIN base_class c ON c.id = s.class_id AND c.deleted = 0
+    </sql>
+
+    <select id="selectLeavePage" resultType="com.aas.entity.AttLeave">
+        SELECT
+        <include refid="leaveColumns"/>
+        <include refid="leaveJoins"/>
+        WHERE 1 = 1
+        <if test="scope != null and !scope.global">
+            <choose>
+                <when test="scope.studentId != null">
+                    AND l.student_id = #{scope.studentId}
+                </when>
+                <when test="scope.classIds != null and scope.classIds.size() > 0">
+                    AND s.class_id IN
+                    <foreach collection="scope.classIds" item="cid" open="(" separator="," close=")">#{cid}</foreach>
+                </when>
+                <otherwise>
+                    AND 1 = 0
+                </otherwise>
+            </choose>
+        </if>
+        <if test="q.keyword != null and q.keyword != ''">
+            AND (s.student_no LIKE CONCAT('%', #{q.keyword}, '%')
+            OR s.name LIKE CONCAT('%', #{q.keyword}, '%')
+            OR l.reason LIKE CONCAT('%', #{q.keyword}, '%'))
+        </if>
+        <if test="q.classId != null">AND s.class_id = #{q.classId}</if>
+        <if test="q.studentId != null">AND l.student_id = #{q.studentId}</if>
+        <if test="q.status != null">AND l.status = #{q.status}</if>
+        <if test="q.leaveType != null and q.leaveType != ''">AND l.leave_type = #{q.leaveType}</if>
+        <if test="q.startDate != null">AND DATE(l.start_date) &gt;= #{q.startDate}</if>
+        <if test="q.endDate != null">AND DATE(l.start_date) &lt;= #{q.endDate}</if>
+        ORDER BY l.status ASC, l.create_time DESC
+    </select>
+
+    <select id="selectLeaveDetail" resultType="com.aas.entity.AttLeave">
+        SELECT
+        <include refid="leaveColumns"/>
+        <include refid="leaveJoins"/>
+        WHERE l.id = #{id}
+    </select>
+
+    <select id="countPending" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        <include refid="leaveJoins"/>
+        WHERE l.status = 0
+        <if test="scope != null and !scope.global">
+            <choose>
+                <when test="scope.studentId != null">
+                    AND l.student_id = #{scope.studentId}
+                </when>
+                <when test="scope.classIds != null and scope.classIds.size() > 0">
+                    AND s.class_id IN
+                    <foreach collection="scope.classIds" item="cid" open="(" separator="," close=")">#{cid}</foreach>
+                </when>
+                <otherwise>
+                    AND 1 = 0
+                </otherwise>
+            </choose>
+        </if>
+    </select>
+
+</mapper>

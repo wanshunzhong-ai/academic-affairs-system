@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aas.mapper.CourseOfferingMapper">
+
+    <sql id="offeringColumns">
+        o.id, o.offering_code, o.course_id, o.semester_id, o.teacher_id, o.class_id,
+        o.capacity, o.selected_count, o.is_public, o.status, o.remark, o.create_time, o.update_time,
+        cc.course_code AS courseCode, cc.course_name AS courseName, cc.credit AS credit,
+        cc.hours AS hours, cc.course_type AS courseType, cc.exam_type AS examType,
+        t.name AS teacherName, t.teacher_no AS teacherNo,
+        c.class_name AS className,
+        sem.semester_name AS semesterName,
+        d.id AS deptId, d.dept_name AS deptName
+    </sql>
+
+    <sql id="offeringJoins">
+        FROM course_offering o
+        INNER JOIN course_course cc ON cc.id = o.course_id AND cc.deleted = 0
+        LEFT JOIN tea_teacher t ON t.id = o.teacher_id AND t.deleted = 0
+        LEFT JOIN base_class c ON c.id = o.class_id AND c.deleted = 0
+        LEFT JOIN base_semester sem ON sem.id = o.semester_id
+        LEFT JOIN base_dept d ON d.id = cc.dept_id
+    </sql>
+
+    <select id="selectOfferingPage" resultType="com.aas.entity.CourseOffering">
+        SELECT
+        <include refid="offeringColumns"/>
+        <include refid="offeringJoins"/>
+        WHERE o.deleted = 0
+        <if test="q.keyword != null and q.keyword != ''">
+            AND (cc.course_name LIKE CONCAT('%', #{q.keyword}, '%')
+            OR cc.course_code LIKE CONCAT('%', #{q.keyword}, '%')
+            OR o.offering_code LIKE CONCAT('%', #{q.keyword}, '%')
+            OR t.name LIKE CONCAT('%', #{q.keyword}, '%'))
+        </if>
+        <if test="q.semesterId != null">AND o.semester_id = #{q.semesterId}</if>
+        <if test="q.teacherId != null">AND o.teacher_id = #{q.teacherId}</if>
+        <if test="q.classId != null">AND o.class_id = #{q.classId}</if>
+        <if test="q.courseId != null">AND o.course_id = #{q.courseId}</if>
+        <if test="q.isPublic != null">AND o.is_public = #{q.isPublic}</if>
+        <if test="q.status != null">AND o.status = #{q.status}</if>
+        ORDER BY o.semester_id DESC, o.is_public ASC, o.id ASC
+    </select>
+
+    <select id="selectOfferingDetail" resultType="com.aas.entity.CourseOffering">
+        SELECT
+        <include refid="offeringColumns"/>
+        <include refid="offeringJoins"/>
+        WHERE o.id = #{id} AND o.deleted = 0
+    </select>
+
+    <select id="selectStudentTimetable" resultType="com.aas.entity.CourseOffering">
+        SELECT
+        <include refid="offeringColumns"/>
+        FROM course_selection sel
+        INNER JOIN course_offering o ON o.id = sel.offering_id AND o.deleted = 0
+        INNER JOIN course_course cc ON cc.id = o.course_id AND cc.deleted = 0
+        LEFT JOIN tea_teacher t ON t.id = o.teacher_id AND t.deleted = 0
+        LEFT JOIN base_class c ON c.id = o.class_id AND c.deleted = 0
+        LEFT JOIN base_semester sem ON sem.id = o.semester_id
+        LEFT JOIN base_dept d ON d.id = cc.dept_id
+        WHERE sel.student_id = #{studentId} AND sel.status = 1
+        <if test="semesterId != null">AND o.semester_id = #{semesterId}</if>
+        ORDER BY o.id ASC
+    </select>
+
+    <select id="selectTeacherTimetable" resultType="com.aas.entity.CourseOffering">
+        SELECT
+        <include refid="offeringColumns"/>
+        <include refid="offeringJoins"/>
+        WHERE o.deleted = 0 AND o.teacher_id = #{teacherId}
+        <if test="semesterId != null">AND o.semester_id = #{semesterId}</if>
+        ORDER BY o.id ASC
+    </select>
+
+    <select id="selectClassTimetable" resultType="com.aas.entity.CourseOffering">
+        SELECT
+        <include refid="offeringColumns"/>
+        <include refid="offeringJoins"/>
+        WHERE o.deleted = 0 AND o.class_id = #{classId}
+        <if test="semesterId != null">AND o.semester_id = #{semesterId}</if>
+        ORDER BY o.id ASC
+    </select>
+
+    <select id="selectSelectableOfferings" resultType="com.aas.entity.CourseOffering">
+        SELECT
+        <include refid="offeringColumns"/>
+        <include refid="offeringJoins"/>
+        WHERE o.deleted = 0
+        AND o.status = 1
+        AND (o.is_public = 1
+        <if test="classId != null">
+            OR o.class_id = #{classId}
+        </if>
+        )
+        AND NOT EXISTS (
+        SELECT 1 FROM course_selection sel
+        WHERE sel.offering_id = o.id AND sel.student_id = #{studentId} AND sel.status = 1
+        )
+        <if test="semesterId != null">AND o.semester_id = #{semesterId}</if>
+        <if test="keyword != null and keyword != ''">
+            AND (cc.course_name LIKE CONCAT('%', #{keyword}, '%')
+            OR cc.course_code LIKE CONCAT('%', #{keyword}, '%')
+            OR t.name LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        ORDER BY o.is_public ASC, cc.course_code ASC
+    </select>
+
+    <select id="countSelected" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM course_selection
+        WHERE offering_id = #{offeringId} AND status = 1
+    </select>
+
+</mapper>

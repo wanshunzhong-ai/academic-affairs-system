@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aas.mapper.SysUserMapper">
+
+    <sql id="userColumns">
+        u.id, u.username, u.real_name, u.user_type, u.gender, u.phone, u.email,
+        u.status, u.avatar, u.last_login_time, u.last_login_ip, u.remark, u.create_time, u.update_time
+    </sql>
+
+    <select id="selectUserPage" resultType="com.aas.entity.SysUser">
+        SELECT
+        <include refid="userColumns"/>
+        FROM sys_user u
+        WHERE u.deleted = 0
+        <if test="q.username != null and q.username != ''">
+            AND (u.username LIKE CONCAT('%', #{q.username}, '%')
+            OR u.real_name LIKE CONCAT('%', #{q.username}, '%')
+            OR u.phone LIKE CONCAT('%', #{q.username}, '%'))
+        </if>
+        <if test="q.userType != null and q.userType != ''">
+            AND u.user_type = #{q.userType}
+        </if>
+        <if test="q.status != null">
+            AND u.status = #{q.status}
+        </if>
+        <if test="roleCode != null and roleCode != ''">
+            AND EXISTS (
+            SELECT 1 FROM sys_user_role ur
+            INNER JOIN sys_role r ON r.id = ur.role_id
+            WHERE ur.user_id = u.id AND r.role_code = #{roleCode}
+            )
+        </if>
+        ORDER BY u.id ASC
+    </select>
+
+    <select id="selectRoleRowsByUserIds" resultType="com.aas.dto.UserRoleDTO">
+        SELECT ur.user_id AS userId, r.id AS roleId, r.role_name AS roleName, r.role_code AS roleCode
+        FROM sys_user_role ur
+        INNER JOIN sys_role r ON r.id = ur.role_id
+        WHERE ur.user_id IN
+        <foreach collection="userIds" item="uid" open="(" separator="," close=")">#{uid}</foreach>
+        ORDER BY r.sort ASC
+    </select>
+
+    <select id="selectRoleCodesByUserId" resultType="java.lang.String">
+        SELECT r.role_code
+        FROM sys_user_role ur
+        INNER JOIN sys_role r ON r.id = ur.role_id
+        WHERE ur.user_id = #{userId} AND r.status = 1
+        ORDER BY r.sort ASC
+    </select>
+
+    <select id="selectRoleIdsByUserId" resultType="java.lang.Long">
+        SELECT r.id
+        FROM sys_user_role ur
+        INNER JOIN sys_role r ON r.id = ur.role_id
+        WHERE ur.user_id = #{userId}
+    </select>
+
+    <select id="selectPermsByUserId" resultType="java.lang.String">
+        SELECT DISTINCT m.perms
+        FROM sys_menu m
+        INNER JOIN sys_role_menu rm ON rm.menu_id = m.id
+        INNER JOIN sys_user_role ur ON ur.role_id = rm.role_id
+        WHERE ur.user_id = #{userId}
+          AND m.status = 1
+          AND m.perms IS NOT NULL
+          AND m.perms != ''
+    </select>
+
+    <select id="selectMainRoleCode" resultType="java.lang.String">
+        SELECT r.role_code
+        FROM sys_user_role ur
+        INNER JOIN sys_role r ON r.id = ur.role_id
+        WHERE ur.user_id = #{userId}
+        ORDER BY FIELD(r.role_code, 'ADMIN', 'ACADEMIC', 'HEAD_TEACHER', 'STUDENT'), r.sort ASC
+        LIMIT 1
+    </select>
+
+</mapper>

@@ -1,0 +1,110 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /
+  tomcat:
+    uri-encoding: UTF-8
+
+spring:
+  application:
+    name: academic-affairs-system
+  profiles:
+    active: dev
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 数据库连接：默认值可直接在本机跑通（localhost:3306 / root / 123456）。
+    # 需要改的话，推荐用环境变量覆盖，而不是改这个文件：
+    #   DB_HOST / DB_PORT / DB_NAME / DB_USERNAME / DB_PASSWORD
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:academic_affairs}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true&connectionCollation=utf8mb4_general_ci
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 600000
+      connection-timeout: 30000
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    serialization:
+      write-dates-as-timestamps: false
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 50MB
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+  web:
+    resources:
+      # 静态资源（含打包进 jar 的前端页面）不做强缓存：升级版本后浏览器立刻用新页面。
+      # 前端 js/css 文件名自带内容哈希，本来就无需担心缓存问题。
+      cache:
+        cachecontrol:
+          no-cache: true
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.aas.entity
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+      insert-strategy: not_null
+      update-strategy: not_null
+  configuration:
+    map-underscore-to-camel-case: true
+    call-setters-on-nulls: true
+    default-enum-type-handler: org.apache.ibatis.type.EnumOrdinalTypeHandler
+
+# ==================== 业务配置 ====================
+aas:
+  jwt:
+    # HS256 密钥。默认值仅供本机跑通演示，生产环境务必用环境变量覆盖：
+    #   AAS_JWT_SECRET
+    secret: ${AAS_JWT_SECRET:aas-academic-affairs-system-jwt-secret-key-2026-please-change-me}
+    # token 有效期(分钟)
+    expire-minutes: 720
+    header: Authorization
+    prefix: "Bearer "
+  cors:
+    allowed-origins: "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173"
+  # ==================== 登录入口 ====================
+  # 系统只有一个登录入口 /login，登录后按账号身份进入对应后台（菜单与数据由后端 RBAC 下发）。
+  #
+  # 启动后控制台打印哪个入口地址：
+  #   留空 = 自动判断
+  #     前端已用 -Pwith-frontend 打进 jar -> http://localhost:{server.port}/login
+  #     前端没打进 jar（IDEA 里前后端分开跑） -> {frontend-url}/login
+  #   填写 = 一律使用这里写的地址（例如部署到 192.168.1.10 时写 http://192.168.1.10:8080/login）
+  entry-url: ""
+  # 前端开发服务器地址（仅在「没内嵌前端」时用于拼入口链接）
+  frontend-url: http://localhost:5173
+  # 是否在登录页展示「演示账号一键填充」。
+  # 默认 false —— 演示账号只写在《部署文档.md》附录 A，登录页不出现任何账号。
+  # 需要对外演示时改成 true 并重启即可（无需重新构建前端）。
+  demo-accounts: false
+
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+springdoc:
+  swagger-ui:
+    path: /doc.html
+  api-docs:
+    path: /v3/api-docs
+
+logging:
+  level:
+    root: info
+    com.aas: debug
+    com.aas.mapper: debug
+  pattern:
+    console: "%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(%5p) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n%wEx"

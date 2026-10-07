@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="一键启动-前后端" type="CompoundRunConfigurationType" factoryName="Compound">
+    <toRun name="后端-启动服务" type="Application" />
+    <toRun name="前端-启动开发服务(兼容)" type="ShConfigurationType" />
+    <method v="2" />
+  </configuration>
+</component>

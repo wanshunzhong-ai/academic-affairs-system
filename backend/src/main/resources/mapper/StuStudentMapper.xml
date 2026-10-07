@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.aas.mapper.StuStudentMapper">
+
+    <sql id="baseColumns">
+        s.id, s.user_id, s.student_no, s.name, s.gender, s.birth_date, s.id_card, s.phone, s.email,
+        s.dept_id, s.major_id, s.class_id, s.enrollment_date, s.political_status, s.address,
+        s.guardian_name, s.guardian_phone, s.dormitory, s.photo, s.status, s.create_time, s.update_time
+    </sql>
+
+    <select id="selectStudentPage" resultType="com.aas.entity.StuStudent">
+        SELECT
+        <include refid="baseColumns"/>,
+        d.dept_name AS deptName,
+        m.major_name AS majorName,
+        c.class_name AS className,
+        c.grade AS grade
+        FROM stu_student s
+        LEFT JOIN base_dept d ON d.id = s.dept_id
+        LEFT JOIN base_major m ON m.id = s.major_id
+        LEFT JOIN base_class c ON c.id = s.class_id
+        WHERE s.deleted = 0
+        <if test="scope != null and !scope.global">
+            <choose>
+                <when test="scope.studentId != null">
+                    AND s.id = #{scope.studentId}
+                </when>
+                <when test="scope.classIds != null and scope.classIds.size() > 0">
+                    AND s.class_id IN
+                    <foreach collection="scope.classIds" item="cid" open="(" separator="," close=")">#{cid}</foreach>
+                </when>
+                <otherwise>
+                    AND 1 = 0
+                </otherwise>
+            </choose>
+        </if>
+        <if test="q.keyword != null and q.keyword != ''">
+            AND (s.student_no LIKE CONCAT('%', #{q.keyword}, '%')
+            OR s.name LIKE CONCAT('%', #{q.keyword}, '%')
+            OR s.phone LIKE CONCAT('%', #{q.keyword}, '%'))
+        </if>
+        <if test="q.deptId != null">AND s.dept_id = #{q.deptId}</if>
+        <if test="q.majorId != null">AND s.major_id = #{q.majorId}</if>
+        <if test="q.classId != null">AND s.class_id = #{q.classId}</if>
+        <if test="q.grade != null and q.grade != ''">AND c.grade = #{q.grade}</if>
+        <if test="q.gender != null">AND s.gender = #{q.gender}</if>
+        <if test="q.status != null">AND s.status = #{q.status}</if>
+        ORDER BY s.class_id ASC, s.student_no ASC
+    </select>
+
+    <select id="selectStudentDetail" resultType="com.aas.entity.StuStudent">
+        SELECT
+        <include refid="baseColumns"/>,
+        d.dept_name AS deptName,
+        m.major_name AS majorName,
+        c.class_name AS className,
+        c.grade AS grade
+        FROM stu_student s
+        LEFT JOIN base_dept d ON d.id = s.dept_id
+        LEFT JOIN base_major m ON m.id = s.major_id
+        LEFT JOIN base_class c ON c.id = s.class_id
+        WHERE s.id = #{id} AND s.deleted = 0
+    </select>
+
+    <select id="selectByUserId" resultType="com.aas.entity.StuStudent">
+        SELECT
+        <include refid="baseColumns"/>,
+        d.dept_name AS deptName,
+        m.major_name AS majorName,
+        c.class_name AS className,
+        c.grade AS grade
+        FROM stu_student s
+        LEFT JOIN base_dept d ON d.id = s.dept_id
+        LEFT JOIN base_major m ON m.id = s.major_id
+        LEFT JOIN base_class c ON c.id = s.class_id
+        WHERE s.user_id = #{userId} AND s.deleted = 0
+        LIMIT 1
+    </select>
+
+</mapper>
