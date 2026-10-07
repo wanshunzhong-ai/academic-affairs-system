@@ -245,6 +245,11 @@ npm run dev
 
 或直接双击 `start-frontend.bat`。访问 http://localhost:5173
 
+> **端口锁定 5173**（`vite.config.js` 设 `strictPort: true`，与后端启动横幅打印的入口地址一致）。
+> 若 5173 被占用，`npm run dev` 会先自动打印**占用者 PID 与清理命令**
+> （`frontend/scripts/check-port.mjs`，由 `predev` 钩子触发），不会只抛一句英文报错。
+> 处理办法见 [`运行指南.md`](运行指南.md) 7.1。
+
 ### 登录入口（只有一个）
 
 系统**只有一个登录入口**：<http://localhost:5173/login>
